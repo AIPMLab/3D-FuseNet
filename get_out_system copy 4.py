@@ -1,22 +1,24 @@
+from pathlib import Path
+
+import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
+import pingouin as pg
 import torch
 import torchextractor as tx
-from pathlib import Path
-from rich.progress import Progress, TextColumn
-from dataloader import BraTSDataset
-import numpy as np
-from torch.utils.data import DataLoader
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.svm import SVR
-from sklearn.linear_model import LinearRegression
-from sklearn.neighbors import KNeighborsRegressor
-from lifelines.utils import concordance_index
-from scipy.stats import pearsonr, spearmanr
-from sklearn.metrics import mean_absolute_error, mean_squared_error
-import pingouin as pg
-import matplotlib.pyplot as plt
 from lifelines import CoxPHFitter
 from lifelines.statistics import logrank_test
+from lifelines.utils import concordance_index
+from rich.progress import Progress, TextColumn
+from scipy.stats import pearsonr, spearmanr
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_absolute_error, mean_squared_error
+from sklearn.neighbors import KNeighborsRegressor
+from sklearn.svm import SVR
+from torch.utils.data import DataLoader
+
+from dataloader import BraTSDataset
 
 
 def rf():
@@ -53,27 +55,20 @@ train_dataloader = DataLoader(train_dataset,
                               pin_memory=True)
 val_dataset = BraTSDataset(
     r"D:\yolov9\BraTS2020_TrainingData\MICCAI_BraTS2020_TrainingData", "val")
-val_dataloader = DataLoader(val_dataset,
-                            batch_size=1,
-                            shuffle=False,
-                            pin_memory=True)
+val_dataloader = DataLoader(val_dataset, batch_size=1, shuffle=False, pin_memory=True)
 test_dataset = BraTSDataset(
     r"D:\yolov9\BraTS2020_TrainingData\MICCAI_BraTS2020_TrainingData", "test")
-test_dataloader = DataLoader(test_dataset,
-                             batch_size=1,
-                             shuffle=False,
-                             pin_memory=True)
+test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=False, pin_memory=True)
 
 name = [
-    "Optim", "TraditionModel", "MAE", "RMSE", "C-index", "SpearmanR",
-    "p-value", "hr", "95%-ci"
+    "Optim", "TraditionModel", "MAE", "RMSE", "C-index", "SpearmanR", "p-value", "hr",
+    "95%-ci"
 ]
 
 fig, axs = plt.subplots(5, 2, figsize=(10, 15), constrained_layout=True)
 with open(f"2_test_resnet50.csv", "w", encoding="UTF-8") as f:
     f.write(",".join(name) + "\n")
-    for num, optim in enumerate(p for p in module_path.iterdir()
-                                if p.is_dir()):
+    for num, optim in enumerate(p for p in module_path.iterdir() if p.is_dir()):
         model = torch.load(optim / "model" / "best_epoch.pth")
         extract_model = tx.Extractor(model, ["decoder_model.8"]).to(device)
 
@@ -81,20 +76,17 @@ with open(f"2_test_resnet50.csv", "w", encoding="UTF-8") as f:
         y_train = []
         with torch.no_grad(), Progress(
                 *Progress.get_default_columns(),
-                TextColumn(
-                    "Loss={task.fields[loss]}, MSE={task.fields[mse]}")) as p:
+                TextColumn("Loss={task.fields[loss]}, MSE={task.fields[mse]}")) as p:
             task = p.add_task("Testing", loss=0, mse=0)
-            for i, (data, survival_day, age, resection) in enumerate(
-                    p.track(train_dataloader, task_id=task), 1):
-                data, survival_day, age, resection = data.to(
-                    device), survival_day.to(device), age.to(
-                        device), resection.to(device)
+            for i, (data, survival_day, age,
+                    resection) in enumerate(p.track(train_dataloader, task_id=task), 1):
+                data, survival_day, age, resection = data.to(device), survival_day.to(
+                    device), age.to(device), resection.to(device)
                 _, features = extract_model(data)
                 #result = model(data, age, resection)
                 x_train_feature.append(
                     np.hstack([
-                        features["decoder_model.8"].detach().cpu().numpy().
-                        flatten(),
+                        features["decoder_model.8"].detach().cpu().numpy().flatten(),
                         #age.detach().cpu().numpy().flatten(),
                         #resection.detach().cpu().numpy().flatten(),
                     ]))
@@ -102,20 +94,17 @@ with open(f"2_test_resnet50.csv", "w", encoding="UTF-8") as f:
 
         with torch.no_grad(), Progress(
                 *Progress.get_default_columns(),
-                TextColumn(
-                    "Loss={task.fields[loss]}, MSE={task.fields[mse]}")) as p:
+                TextColumn("Loss={task.fields[loss]}, MSE={task.fields[mse]}")) as p:
             task = p.add_task("Testing", loss=0, mse=0)
-            for i, (data, survival_day, age, resection) in enumerate(
-                    p.track(val_dataloader, task_id=task), 1):
-                data, survival_day, age, resection = data.to(
-                    device), survival_day.to(device), age.to(
-                        device), resection.to(device)
+            for i, (data, survival_day, age,
+                    resection) in enumerate(p.track(val_dataloader, task_id=task), 1):
+                data, survival_day, age, resection = data.to(device), survival_day.to(
+                    device), age.to(device), resection.to(device)
                 _, features = extract_model(data)
                 #result = model(data, age, resection)
                 x_train_feature.append(
                     np.hstack([
-                        features["decoder_model.8"].detach().cpu().numpy().
-                        flatten(),
+                        features["decoder_model.8"].detach().cpu().numpy().flatten(),
                         #age.detach().cpu().numpy().flatten(),
                         #resection.detach().cpu().numpy().flatten(),
                     ]))
@@ -125,20 +114,17 @@ with open(f"2_test_resnet50.csv", "w", encoding="UTF-8") as f:
         y_test = []
         with torch.no_grad(), Progress(
                 *Progress.get_default_columns(),
-                TextColumn(
-                    "Loss={task.fields[loss]}, MSE={task.fields[mse]}")) as p:
+                TextColumn("Loss={task.fields[loss]}, MSE={task.fields[mse]}")) as p:
             task = p.add_task("Testing", loss=0, mse=0)
-            for i, (data, survival_day, age, resection) in enumerate(
-                    p.track(test_dataloader, task_id=task), 1):
-                data, survival_day, age, resection = data.to(
-                    device), survival_day.to(device), age.to(
-                        device), resection.to(device)
+            for i, (data, survival_day, age,
+                    resection) in enumerate(p.track(test_dataloader, task_id=task), 1):
+                data, survival_day, age, resection = data.to(device), survival_day.to(
+                    device), age.to(device), resection.to(device)
                 _, features = extract_model(data)
                 #result = model(data, age, resection)
                 x_test_feature.append(
                     np.hstack([
-                        features["decoder_model.8"].detach().cpu().numpy().
-                        flatten(),
+                        features["decoder_model.8"].detach().cpu().numpy().flatten(),
                         #age.detach().cpu().numpy().flatten(),
                         #resection.detach().cpu().numpy().flatten(),
                     ]))

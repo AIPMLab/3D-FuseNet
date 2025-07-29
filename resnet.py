@@ -1,13 +1,13 @@
+from functools import partial
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
-import math
-from functools import partial
 
 __all__ = [
-    'ResNet', 'resnet10', 'resnet18', 'resnet34', 'resnet50', 'resnet101',
-    'resnet152', 'resnet200'
+    'ResNet', 'resnet10', 'resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152',
+    'resnet200'
 ]
 
 
@@ -44,17 +44,9 @@ def downsample_basic_block(x, planes, stride, no_cuda=False):
 class BasicBlock(nn.Module):
     expansion = 1
 
-    def __init__(self,
-                 inplanes,
-                 planes,
-                 stride=1,
-                 dilation=1,
-                 downsample=None):
+    def __init__(self, inplanes, planes, stride=1, dilation=1, downsample=None):
         super(BasicBlock, self).__init__()
-        self.conv1 = conv3x3x3(inplanes,
-                               planes,
-                               stride=stride,
-                               dilation=dilation)
+        self.conv1 = conv3x3x3(inplanes, planes, stride=stride, dilation=dilation)
         self.bn1 = nn.BatchNorm3d(planes)
         self.relu = nn.ReLU(inplace=True)
         self.conv2 = conv3x3x3(planes, planes, dilation=dilation)
@@ -84,12 +76,7 @@ class BasicBlock(nn.Module):
 class Bottleneck(nn.Module):
     expansion = 4
 
-    def __init__(self,
-                 inplanes,
-                 planes,
-                 stride=1,
-                 dilation=1,
-                 downsample=None):
+    def __init__(self, inplanes, planes, stride=1, dilation=1, downsample=None):
         super(Bottleneck, self).__init__()
         self.conv1 = nn.Conv3d(inplanes, planes, kernel_size=1, bias=False)
         self.bn1 = nn.BatchNorm3d(planes)
@@ -156,11 +143,7 @@ class ResNet(nn.Module):
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool3d(kernel_size=(3, 3, 3), stride=2, padding=1)
         self.layer1 = self._make_layer(block, 64, layers[0], shortcut_type)
-        self.layer2 = self._make_layer(block,
-                                       128,
-                                       layers[1],
-                                       shortcut_type,
-                                       stride=2)
+        self.layer2 = self._make_layer(block, 128, layers[1], shortcut_type, stride=2)
         self.layer3 = self._make_layer(block,
                                        256,
                                        layers[2],
@@ -183,11 +166,7 @@ class ResNet(nn.Module):
                       stride=(1, 1, 1),
                       padding=(1, 1, 1),
                       bias=False), nn.BatchNorm3d(32), nn.ReLU(inplace=True),
-            nn.Conv3d(32,
-                      num_seg_classes,
-                      kernel_size=1,
-                      stride=(1, 1, 1),
-                      bias=False))
+            nn.Conv3d(32, num_seg_classes, kernel_size=1, stride=(1, 1, 1), bias=False))
 
         for m in self.modules():
             if isinstance(m, nn.Conv3d):
@@ -196,13 +175,7 @@ class ResNet(nn.Module):
                 m.weight.data.fill_(1)
                 m.bias.data.zero_()
 
-    def _make_layer(self,
-                    block,
-                    planes,
-                    blocks,
-                    shortcut_type,
-                    stride=1,
-                    dilation=1):
+    def _make_layer(self, block, planes, blocks, shortcut_type, stride=1, dilation=1):
         downsample = None
         if stride != 1 or self.inplanes != planes * block.expansion:
             if shortcut_type == 'A':
@@ -216,8 +189,7 @@ class ResNet(nn.Module):
                               planes * block.expansion,
                               kernel_size=1,
                               stride=stride,
-                              bias=False),
-                    nn.BatchNorm3d(planes * block.expansion))
+                              bias=False), nn.BatchNorm3d(planes * block.expansion))
 
         layers = []
         layers.append(
@@ -305,12 +277,11 @@ class RegressionModel(nn.Module):
                                       sample_input_W=128,
                                       num_seg_classes=256)
         self.flatten = nn.Sequential(nn.AvgPool3d(8), nn.Flatten())
-        self.decoder_model = nn.Sequential(nn.Linear(256 * 4 * 4 * 4, 512),
-                                           nn.Dropout(0.1), nn.ReLU(),
+        self.decoder_model = nn.Sequential(nn.Linear(256 * 4 * 4 * 4,
+                                                     512), nn.Dropout(0.1), nn.ReLU(),
                                            nn.Linear(512, 64), nn.Dropout(0.1),
-                                           nn.ReLU(), nn.Linear(64, 8),
-                                           nn.ReLU(), nn.Dropout(0.1),
-                                           nn.Linear(8, 1))
+                                           nn.ReLU(), nn.Linear(64, 8), nn.ReLU(),
+                                           nn.Dropout(0.1), nn.Linear(8, 1))
 
     def forward(self, x):
         # embedding the input

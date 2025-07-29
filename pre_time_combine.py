@@ -1,16 +1,18 @@
+import sys
+
+import matplotlib.pyplot as plt
+import numpy as np
 import torch
+from lifelines import KaplanMeierFitter
+from lifelines.statistics import logrank_test
+from lifelines.utils import concordance_index
+from monai import losses
+from sklearn.metrics import mean_absolute_error, mean_squared_error
+from torch import nn
 from torch.utils.data import DataLoader
+
 from dataloader_combine import BraTSDataset
 from image_encoder3D import VitRegressionModel
-from lifelines.utils import concordance_index
-from torch import nn
-from lifelines import KaplanMeierFitter
-import matplotlib.pyplot as plt
-from lifelines.statistics import logrank_test
-from sklearn.metrics import mean_absolute_error, mean_squared_error
-import sys
-import numpy as np
-from monai import losses
 
 device = "cuda:0"
 
@@ -22,7 +24,8 @@ dataset = BraTSDataset(
 dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
 
 epoch = int(sys.argv[1]) if sys.argv[1:] else 99
-model = torch.load(r"D:\vit_reg\combination_exp_radiomics_4\model\best_epoch.pth").cuda()
+model = torch.load(
+    r"D:\vit_reg\combination_exp_radiomics_4\model\best_epoch.pth").cuda()
 print(type(model))
 
 criterion = nn.L1Loss().cuda()
@@ -43,9 +46,8 @@ def test(epoch: int):
     preds, truths = [], []
     with torch.no_grad():
         for (data, label, clinical, rad, survival_days) in loader:
-            data, label, clinical, rad, survival_days = data.to(
-                device), label.to(device), clinical.to(device), rad.to(
-                    device), survival_days.to(device)
+            data, label, clinical, rad, survival_days = data.to(device), label.to(
+                device), clinical.to(device), rad.to(device), survival_days.to(device)
             segment, survival = model(data, clinical, rad)
             preds += [pred.item() for pred in survival]
             truths += [truth.item() for truth in survival_days]
@@ -60,10 +62,10 @@ def test(epoch: int):
             epoch_loss += loss_
             #print(loss_, mse)
         #print(f"MAE = {epoch_loss / len(loader)}, RMSE = {(mse_loss / len(loader))**0.5}")
-        preds = dataset.scaler.inverse_transform(
-            np.array(preds).reshape(1, -1)).flatten()
-        truths = dataset.scaler.inverse_transform(
-            np.array(truths).reshape(1, -1)).flatten()
+        preds = dataset.scaler.inverse_transform(np.array(preds).reshape(1,
+                                                                         -1)).flatten()
+        truths = dataset.scaler.inverse_transform(np.array(truths).reshape(
+            1, -1)).flatten()
     #w = np.where(preds==np.NaN)
     #preds = np.delete(preds, w)
     #truths = np.delete(truths, w)
@@ -80,13 +82,9 @@ def test(epoch: int):
     preds = preds[0]
     #print(preds)
     kmf = KaplanMeierFitter()
-    kmf.fit(durations=truths,
-            event_observed=[1 for i in truths],
-            label="Truth")
+    kmf.fit(durations=truths, event_observed=[1 for i in truths], label="Truth")
     ax = kmf.plot_survival_function()
-    kmf.fit(durations=preds,
-            event_observed=[1 for i in preds],
-            label="Predict")
+    kmf.fit(durations=preds, event_observed=[1 for i in preds], label="Predict")
     kmf.plot_survival_function(ax=ax)
 
     #plt.savefig("test_2.png")

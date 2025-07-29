@@ -1,14 +1,15 @@
+import matplotlib.pyplot as plt
+import seaborn as sns
 import torch
+from lifelines import KaplanMeierFitter
+from lifelines.statistics import logrank_test
+from lifelines.utils import concordance_index
+from sklearn.metrics import confusion_matrix
+from torch import nn
 from torch.utils.data import DataLoader
+
 from dataloader import BraTSDataset
 from image_encoder3D import VitRegressionModel
-from lifelines.utils import concordance_index
-from torch import nn
-from lifelines import KaplanMeierFitter
-import matplotlib.pyplot as plt
-from lifelines.statistics import logrank_test
-from sklearn.metrics import confusion_matrix
-import seaborn as snsC
 
 device = "cuda:0"
 
@@ -17,9 +18,7 @@ dataset = BraTSDataset(
     "test",
     using_seg=False,
     using_mri=True)
-dataloader = DataLoader(dataset,
-                        batch_size=1,
-                        shuffle=False)
+dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
 
 model = torch.load(r"model/epoch_15.pth").cuda()
 
@@ -39,9 +38,8 @@ def test(epoch: int):
     preds, truths = [], []
     with torch.no_grad():
         for data, survival_day, age, resection in loader:
-            data, survival_day, age, resection = data.to(
-                device), survival_day.to(device), age.to(
-                    device), resection.to(device)
+            data, survival_day, age, resection = data.to(device), survival_day.to(
+                device), age.to(device), resection.to(device)
             output = model(data, age, resection)
             #print(output.item(), survival_day.item())
             pred, truth = output.item(), survival_day.item()
@@ -57,10 +55,9 @@ def test(epoch: int):
         ax.set_ylabel('true')  #y轴
         f.savefig("heatmap.png")
 
-        print("accuracy_score", accuracy_score(truths, preds),
-              "precision_score", precision_score(truths, preds),
-              "recall_score", recall_score(truths, preds), 
-              "f1_score", f1_score(truths, preds))
+        print("accuracy_score", accuracy_score(truths, preds), "precision_score",
+              precision_score(truths, preds), "recall_score",
+              recall_score(truths, preds), "f1_score", f1_score(truths, preds))
     return epoch_loss / len(loader)
 
 

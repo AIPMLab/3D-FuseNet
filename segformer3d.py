@@ -1,9 +1,10 @@
-import torch
-import math
 import copy
-from torch import nn
-from einops import rearrange
+import math
 from functools import partial
+
+import torch
+from torch import nn
+
 from radiomics_getter import extract_features
 
 
@@ -25,30 +26,35 @@ def build_segformer3d_model(config=None):
     )
     return model
 
+
 class RBFRegression(nn.Module):
-    def __init__(self,centers=None,n_out=1):
+
+    def __init__(self, centers=None, n_out=1):
         super().__init__()
         if centers is None:
-            centers = torch.randn(4,n_out)
+            centers = torch.randn(4, n_out)
         self.n_out = n_out
         self.num_centers = centers.size(0)
 
         self.centers = nn.Parameter(centers)
-        self.beta = nn.Parameter(torch.ones(1,self.num_centers))
+        self.beta = nn.Parameter(torch.ones(1, self.num_centers))
         self.linear = nn.Linear(8, self.n_out)
         self.initialize_weights()
 
-    def kernel_fun(self,batches):
+    def kernel_fun(self, batches):
         n_input = batches.size(0)
-        c = self.centers.view(self.num_centers,-1).repeat(n_input,1,1)# torch.Size([500, 500, 1])
-        x = batches.view(n_input,-1).unsqueeze(1).repeat(1,self.num_centers,1)# torch.Size([500, 500, 1])
-        radial_val = torch.exp(-self.beta.mul((c-x).pow(2).sum(2)))
+        c = self.centers.view(self.num_centers,
+                              -1).repeat(n_input, 1, 1)  # torch.Size([500, 500, 1])
+        x = batches.view(n_input,
+                         -1).unsqueeze(1).repeat(1, self.num_centers,
+                                                 1)  # torch.Size([500, 500, 1])
+        radial_val = torch.exp(-self.beta.mul((c - x).pow(2).sum(2)))
         return radial_val
 
     def forward(self, x):
         # 计算径向基距离函数
         radial_val = self.kernel_fun(x)
-        out = self.linear(torch.cat([x,radial_val],dim=1))
+        out = self.linear(torch.cat([x, radial_val], dim=1))
         return out
 
     def initialize_weights(self):
@@ -63,9 +69,10 @@ class RBFRegression(nn.Module):
                 m.weight.data.normal_(0, 0.2)
                 m.bias.data.zero_()
 
+
 class RegressionModel(nn.Module):
 
-    def __init__(self, with_clinical=False, middle=2, clinical_ = 4) -> None:
+    def __init__(self, with_clinical=False, middle=2, clinical_=4) -> None:
         super().__init__()
         self.with_clinical = with_clinical
         self.encoder_model = MixVisionTransformer(
@@ -95,15 +102,17 @@ class RegressionModel(nn.Module):
             nn.Linear(8, 1)
         ]
 
-        self.decoder_model = nn.Sequential(*seq_list[:3*middle])
+        self.decoder_model = nn.Sequential(*seq_list[:3 * middle])
         #combine_layer: nn.Linear = seq_list[3*middle]
         if with_clinical:
-            combine_layer = nn.Linear(seq_list[3*middle].in_features + (clinical_ if with_clinical else 0), seq_list[3*middle].out_features)
-            self.output_model = nn.Sequential(combine_layer, *seq_list[3*middle+1:])
+            combine_layer = nn.Linear(
+                seq_list[3 * middle].in_features + (clinical_ if with_clinical else 0),
+                seq_list[3 * middle].out_features)
+            self.output_model = nn.Sequential(combine_layer, *seq_list[3 * middle + 1:])
         else:
-            self.output_model = nn.Sequential(*seq_list[3*middle:])
+            self.output_model = nn.Sequential(*seq_list[3 * middle:])
 
-    def forward(self, x, age = None, resection = None):
+    def forward(self, x, age=None, resection=None):
         # embedding the input
         #print(x.shape)
         x = self.encoder_model(x)
@@ -113,8 +122,7 @@ class RegressionModel(nn.Module):
         x = self.decoder_model(x)
         if self.with_clinical and age is not None and resection is not None:
             #clinical = self.clinical_encoder(torch.cat((age, resection), dim=1))
-            clinical_data = self.clinical_model(
-                torch.cat((age, resection), dim=1))
+            clinical_data = self.clinical_model(torch.cat((age, resection), dim=1))
             x = torch.cat((x, clinical_data), dim=1)
         x = self.output_model(x)
         return x
@@ -127,14 +135,13 @@ class RadiomicsExtraction(nn.Module):
 
     def forward(self, image, label):
         for i in image:
-            feature = extract_features(image.cpu().numpy(),
-                                       label.cpu().numpy())
+            feature = extract_features(image.cpu().numpy(), label.cpu().numpy())
         return x
 
 
 class CombinationModel(nn.Module):
 
-    def __init__(self, with_clinical=False, middle=2, clinical_ = 4) -> None:
+    def __init__(self, with_clinical=False, middle=2, clinical_=4) -> None:
         super().__init__()
         self.segformer_encoder = MixVisionTransformer(
             in_channels=4,
@@ -155,7 +162,7 @@ class CombinationModel(nn.Module):
             num_classes=3,
             dropout=0.0,
         )
-        
+
         self.flatten = nn.Flatten()
 
         if with_clinical:
@@ -173,13 +180,15 @@ class CombinationModel(nn.Module):
             nn.Linear(8, 1)
         ]
 
-        self.decoder_model = nn.Sequential(*seq_list[:3*middle])
+        self.decoder_model = nn.Sequential(*seq_list[:3 * middle])
         #combine_layer: nn.Linear = seq_list[3*middle]
         if with_clinical:
-            combine_layer = nn.Linear(seq_list[3*middle].in_features + (clinical_ if with_clinical else 0), seq_list[3*middle].out_features)
-            self.output_model = nn.Sequential(combine_layer, *seq_list[3*middle+1:])
+            combine_layer = nn.Linear(
+                seq_list[3 * middle].in_features + (clinical_ if with_clinical else 0),
+                seq_list[3 * middle].out_features)
+            self.output_model = nn.Sequential(combine_layer, *seq_list[3 * middle + 1:])
         else:
-            self.output_model = nn.Sequential(*seq_list[3*middle:])
+            self.output_model = nn.Sequential(*seq_list[3 * middle:])
         self.apply(self._init_weights)
 
     def _init_weights(self, m):
@@ -216,8 +225,7 @@ class CombinationModel(nn.Module):
         for param in self.segformer_decoder.parameters():
             param.requires_grad = False
 
-
-    def forward(self, mri_data, freeze_data = None):
+    def forward(self, mri_data, freeze_data=None):
         # embedding the input
         if freeze_data is not None:
             x = freeze_data[:4]
@@ -233,7 +241,7 @@ class CombinationModel(nn.Module):
             x_segment = freeze_data[4]
         else:
             x_segment = self.segformer_decoder(c1, c2, c3, c4)
-            
+
         x_survival = self.output_model(self.decoder_model(self.flatten(c4)))
 
         # decoding the embedded features
@@ -390,8 +398,8 @@ class SelfAttention(nn.Module):
         proj_dropout: the dropout rate of the final linear projection
         """
         super().__init__()
-        assert (embed_dim % num_heads == 0
-                ), "Embedding dim should be divisible by number of heads!"
+        assert (embed_dim %
+                num_heads == 0), "Embedding dim should be divisible by number of heads!"
 
         self.num_heads = num_heads
         # embedding dimesion of each attention head
@@ -419,8 +427,7 @@ class SelfAttention(nn.Module):
 
         # (batch_size, num_head, sequence_length, embed_dim)
         q = (self.query(x).reshape(B, N, self.num_heads,
-                                   self.attention_head_dim).permute(
-                                       0, 2, 1, 3))
+                                   self.attention_head_dim).permute(0, 2, 1, 3))
 
         if self.sr_ratio > 1:
             n = cube_root(N)
@@ -833,7 +840,6 @@ class MixVisionTransformerEx(nn.Module):
         x = x.reshape(B, n, n, n, -1).permute(0, 4, 1, 2, 3).contiguous()
         out.append(x)
 
-
         # stage 4
         x = self.embed_5(x)
         B, N, C = x.shape
@@ -849,6 +855,7 @@ class MixVisionTransformerEx(nn.Module):
         #    print(x_.shape)
 
         return out
+
 
 class _MLP(nn.Module):
 
@@ -982,8 +989,7 @@ class SegFormerDecoderHead(nn.Module):
         n, _, _, _, _ = c4.shape
 
         _c4 = (self.linear_c4(c4).permute(0, 2,
-                                          1).reshape(n, -1, c4.shape[2],
-                                                     c4.shape[3],
+                                          1).reshape(n, -1, c4.shape[2], c4.shape[3],
                                                      c4.shape[4]).contiguous())
         _c4 = torch.nn.functional.interpolate(
             _c4,
@@ -993,8 +999,7 @@ class SegFormerDecoderHead(nn.Module):
         )
 
         _c3 = (self.linear_c3(c3).permute(0, 2,
-                                          1).reshape(n, -1, c3.shape[2],
-                                                     c3.shape[3],
+                                          1).reshape(n, -1, c3.shape[2], c3.shape[3],
                                                      c3.shape[4]).contiguous())
         _c3 = torch.nn.functional.interpolate(
             _c3,
@@ -1004,8 +1009,7 @@ class SegFormerDecoderHead(nn.Module):
         )
 
         _c2 = (self.linear_c2(c2).permute(0, 2,
-                                          1).reshape(n, -1, c2.shape[2],
-                                                     c2.shape[3],
+                                          1).reshape(n, -1, c2.shape[2], c2.shape[3],
                                                      c2.shape[4]).contiguous())
         _c2 = torch.nn.functional.interpolate(
             _c2,
@@ -1015,8 +1019,7 @@ class SegFormerDecoderHead(nn.Module):
         )
 
         _c1 = (self.linear_c1(c1).permute(0, 2,
-                                          1).reshape(n, -1, c1.shape[2],
-                                                     c1.shape[3],
+                                          1).reshape(n, -1, c1.shape[2], c1.shape[3],
                                                      c1.shape[4]).contiguous())
 
         _c = self.linear_fuse(torch.cat([_c4, _c3, _c2, _c1], dim=1))

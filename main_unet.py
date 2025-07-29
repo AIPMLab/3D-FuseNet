@@ -1,19 +1,26 @@
-import torch
-from torch.utils.data import DataLoader
-from dataloader import BraTSDataset
-from unet3d import RegressionModel
-from torch import nn
-from rich.progress import Progress, TextColumn, TimeElapsedColumn
 from pathlib import Path
-from rich import print as rprint
-from lifelines.utils import concordance_index
-from sklearn.metrics import accuracy_score, recall_score, f1_score
-from rich.console import Group
-from rich.live import Live
-from sklearn.metrics import mean_squared_error, mean_absolute_error
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
+import torch
+from lifelines.utils import concordance_index
+from rich import print as rprint
+from rich.console import Group
+from rich.live import Live
+from rich.progress import Progress, TextColumn, TimeElapsedColumn
+from sklearn.metrics import (
+    accuracy_score,
+    f1_score,
+    mean_absolute_error,
+    mean_squared_error,
+    recall_score,
+)
+from torch import nn
+from torch.utils.data import DataLoader
+
+from dataloader import BraTSDataset
+from unet3d import RegressionModel
 
 Path("model").mkdir(exist_ok=True)
 Path("log").mkdir(exist_ok=True)
@@ -82,18 +89,15 @@ optimizer_list = [
 
 train_progress = Progress(*Progress.get_default_columns(),
                           TextColumn("Loss={task.fields[loss]}"))
-test_progress = Progress(
-    *Progress.get_default_columns(),
-    TextColumn("Loss={task.fields[loss]}, MSE={task.fields[mse]}"))
-test_progress = Progress(
-    *Progress.get_default_columns(),
-    TextColumn("Loss={task.fields[loss]}, MSE={task.fields[mse]}"))
+test_progress = Progress(*Progress.get_default_columns(),
+                         TextColumn("Loss={task.fields[loss]}, MSE={task.fields[mse]}"))
+test_progress = Progress(*Progress.get_default_columns(),
+                         TextColumn("Loss={task.fields[loss]}, MSE={task.fields[mse]}"))
 overall_progress = Progress(
     *Progress.get_default_columns(),
     TimeElapsedColumn(),
     TextColumn(
-        "Best Epoch={task.fields[best_epoch]}, No Update={task.fields[no_improve]}"
-    ),
+        "Best Epoch={task.fields[best_epoch]}, No Update={task.fields[no_improve]}"),
     speed_estimate_period=300)
 progress_group = Group(
     train_progress,
@@ -154,9 +158,8 @@ def test(epoch: int):
         p, task = test_progress, test_task
         for i, (data, survival_day, age,
                 resection) in enumerate(p.track(loader, task_id=task), 1):
-            data, survival_day, age, resection = data.to(
-                device), survival_day.to(device), age.to(device), resection.to(
-                    device)
+            data, survival_day, age, resection = data.to(device), survival_day.to(
+                device), age.to(device), resection.to(device)
             output = model(data, age, resection)
             preds += [pred.item() for pred in output]
             truths += [truth.item() for truth in survival_day]
@@ -166,10 +169,8 @@ def test(epoch: int):
             loss_ = loss.item()
             epoch_loss += loss_
             p.update(task, loss=epoch_loss / i, mse=mse_loss / i)
-        preds = test_dataset.scaler.inverse_transform(
-            np.array(preds).reshape(1, -1))
-        truths = test_dataset.scaler.inverse_transform(
-            np.array(truths).reshape(1, -1))
+        preds = test_dataset.scaler.inverse_transform(np.array(preds).reshape(1, -1))
+        truths = test_dataset.scaler.inverse_transform(np.array(truths).reshape(1, -1))
         rprint(f"MAE = {mean_absolute_error(truths, preds)}, "
                f"RMSE = {mean_squared_error(truths, preds)**0.5}, "
                f"C index = {concordance_index(truths, preds)}")
@@ -246,12 +247,12 @@ if __name__ == '__main__':
     all_op = len(optimizer_list)
     experimance_path = Path("only_3d_unet")
     for op_num, op in enumerate(optimizer_list, 1):
-    #for op_num, (middle, clinical_) in enumerate([[3, 1], [1, 2], [2, 2], [1, 4], [2, 1]]):
+        #for op_num, (middle, clinical_) in enumerate([[3, 1], [1, 2], [2, 2], [1, 4], [2, 1]]):
         op = torch.optim.SGD
         all_train_acc = []
         all_test_acc = []
         all_test_cindex = []
-        op_folder = experimance_path / op.__name__ #f"{middle}_{clinical_}"
+        op_folder = experimance_path / op.__name__  #f"{middle}_{clinical_}"
         model = RegressionModel(with_clinical=True).cuda()
         no_improve = 0
         #model_path = op_folder / "model/best_epoch.pth"
@@ -262,7 +263,7 @@ if __name__ == '__main__':
         loss = nn.HuberLoss()
         optimizer = op(model.parameters(), lr=2e-04)
         task = overall_progress.add_task(f"[{op_num}/{all_op}]Total",
-                                         total=epochs*all_op,
+                                         total=epochs * all_op,
                                          best_epoch=best_epoch,
                                          no_improve=no_improve)
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 70, 0.5)
@@ -280,8 +281,7 @@ if __name__ == '__main__':
                 scheduler.step()
                 if len(all_test_acc) <= 1 or valAcc <= min(all_test_acc[:-1]):
                     torch.save(model, op_folder / "model/best_epoch.pth")
-                    torch.save(optimizer,
-                               op_folder / "model/best_optimizer.pth")
+                    torch.save(optimizer, op_folder / "model/best_optimizer.pth")
                     rprint(f"Best Model Update, Epoch {epoch}")
                     (op_folder / "best_epoch.txt").write_text(str(epoch))
                     best_epoch = epoch
@@ -293,22 +293,23 @@ if __name__ == '__main__':
                     rprint("[red]EarlyStopping[default]")
                     break
 
-                overall_progress.update(task, best_epoch=best_epoch, no_improve=no_improve)
+                overall_progress.update(task,
+                                        best_epoch=best_epoch,
+                                        no_improve=no_improve)
 
                 with (op_folder / "test.csv").open("w") as f:
-                    for i, j, k in zip(all_train_acc, all_test_acc,
-                                       all_test_cindex):
+                    for i, j, k in zip(all_train_acc, all_test_acc, all_test_cindex):
                         f.write(f"{i},{j},{k}\n")
                 train_progress.reset(train_task)
                 test_progress.reset(test_task)
                 overall_progress.advance(task)
             pd.read_csv(op_folder / "test.csv",
-                        names=["Train Loss", "Val Loss", "Val C-index"
-                               ]).plot(figsize=(15, 5),
-                                       xticks=range(0, 205, 5),
-                                       title=f"Loss with {op.__name__}",
-                                       xlabel="Epoch",
-                                       ylabel="Loss")
+                        names=["Train Loss", "Val Loss",
+                               "Val C-index"]).plot(figsize=(15, 5),
+                                                    xticks=range(0, 205, 5),
+                                                    title=f"Loss with {op.__name__}",
+                                                    xlabel="Epoch",
+                                                    ylabel="Loss")
             plt.savefig(op_folder / "loss.png")
             plt.cla()
             plt.close()

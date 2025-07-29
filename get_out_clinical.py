@@ -1,22 +1,24 @@
+from pathlib import Path
+
+import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
+import pingouin as pg
 import torch
 import torchextractor as tx
-from pathlib import Path
-from rich.progress import Progress, TextColumn
-from dataloader_kf import BraTSDataset
-import numpy as np
-from torch.utils.data import DataLoader
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.svm import SVR
-from sklearn.linear_model import LinearRegression
-from sklearn.neighbors import KNeighborsRegressor
-from lifelines.utils import concordance_index
-from scipy.stats import pearsonr, spearmanr
-from sklearn.metrics import mean_absolute_error, mean_squared_error
-import pingouin as pg
-import matplotlib.pyplot as plt
 from lifelines import CoxPHFitter
 from lifelines.statistics import logrank_test
+from lifelines.utils import concordance_index
+from rich.progress import Progress, TextColumn
+from scipy.stats import pearsonr, spearmanr
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_absolute_error, mean_squared_error
+from sklearn.neighbors import KNeighborsRegressor
+from sklearn.svm import SVR
+from torch.utils.data import DataLoader
+
+from dataloader_kf import BraTSDataset
 
 
 def rf():
@@ -46,27 +48,28 @@ device = "cuda:0"
 fold_ = 0
 
 train_dataset = BraTSDataset(
-    r"D:\yolov9\BraTS2020_TrainingData\MICCAI_BraTS2020_TrainingData", "train", kfold=fold_, preprocess=False)
+    r"D:\yolov9\BraTS2020_TrainingData\MICCAI_BraTS2020_TrainingData",
+    "train",
+    kfold=fold_,
+    preprocess=False)
 train_dataloader = DataLoader(train_dataset,
                               batch_size=1,
                               shuffle=False,
                               pin_memory=True)
 val_dataset = BraTSDataset(
-    r"D:\yolov9\BraTS2020_TrainingData\MICCAI_BraTS2020_TrainingData", "val", kfold=fold_, preprocess=False)
-val_dataloader = DataLoader(val_dataset,
-                            batch_size=1,
-                            shuffle=False,
-                            pin_memory=True)
+    r"D:\yolov9\BraTS2020_TrainingData\MICCAI_BraTS2020_TrainingData",
+    "val",
+    kfold=fold_,
+    preprocess=False)
+val_dataloader = DataLoader(val_dataset, batch_size=1, shuffle=False, pin_memory=True)
 test_dataset = BraTSDataset(
-    r"D:\yolov9\BraTS2020_TrainingData\MICCAI_BraTS2020_TrainingData", "test", preprocess=False)
-test_dataloader = DataLoader(test_dataset,
-                             batch_size=1,
-                             shuffle=False,
-                             pin_memory=True)
+    r"D:\yolov9\BraTS2020_TrainingData\MICCAI_BraTS2020_TrainingData",
+    "test",
+    preprocess=False)
+test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=False, pin_memory=True)
 
 name = [
-    "TraditionModel", "MAE", "RMSE", "C-index", "SpearmanR",
-    "p-value", "hr", "95%-ci"
+    "TraditionModel", "MAE", "RMSE", "C-index", "SpearmanR", "p-value", "hr", "95%-ci"
 ]
 
 fig, axs = plt.subplots(5, 2, figsize=(10, 15), constrained_layout=True)
@@ -78,14 +81,12 @@ for fold_ in range(5):
         y_train = []
         with torch.no_grad(), Progress(
                 *Progress.get_default_columns(),
-                TextColumn(
-                    "Loss={task.fields[loss]}, MSE={task.fields[mse]}")) as p:
+                TextColumn("Loss={task.fields[loss]}, MSE={task.fields[mse]}")) as p:
             task = p.add_task("Testing", loss=0, mse=0)
-            for i, (data, survival_day, age, resection) in enumerate(
-                    p.track(train_dataloader, task_id=task), 1):
-                data, survival_day, age, resection = data.to(
-                    device), survival_day.to(device), age.to(
-                        device), resection.to(device)
+            for i, (data, survival_day, age,
+                    resection) in enumerate(p.track(train_dataloader, task_id=task), 1):
+                data, survival_day, age, resection = data.to(device), survival_day.to(
+                    device), age.to(device), resection.to(device)
                 #result = model(data, age, resection)
                 x_train_feature.append(
                     np.hstack([
@@ -96,14 +97,12 @@ for fold_ in range(5):
 
         with torch.no_grad(), Progress(
                 *Progress.get_default_columns(),
-                TextColumn(
-                    "Loss={task.fields[loss]}, MSE={task.fields[mse]}")) as p:
+                TextColumn("Loss={task.fields[loss]}, MSE={task.fields[mse]}")) as p:
             task = p.add_task("Testing", loss=0, mse=0)
-            for i, (data, survival_day, age, resection) in enumerate(
-                    p.track(val_dataloader, task_id=task), 1):
-                data, survival_day, age, resection = data.to(
-                    device), survival_day.to(device), age.to(
-                        device), resection.to(device)
+            for i, (data, survival_day, age,
+                    resection) in enumerate(p.track(val_dataloader, task_id=task), 1):
+                data, survival_day, age, resection = data.to(device), survival_day.to(
+                    device), age.to(device), resection.to(device)
                 #result = model(data, age, resection)
                 x_train_feature.append(
                     np.hstack([
@@ -116,14 +115,12 @@ for fold_ in range(5):
         y_test = []
         with torch.no_grad(), Progress(
                 *Progress.get_default_columns(),
-                TextColumn(
-                    "Loss={task.fields[loss]}, MSE={task.fields[mse]}")) as p:
+                TextColumn("Loss={task.fields[loss]}, MSE={task.fields[mse]}")) as p:
             task = p.add_task("Testing", loss=0, mse=0)
-            for i, (data, survival_day, age, resection) in enumerate(
-                    p.track(test_dataloader, task_id=task), 1):
-                data, survival_day, age, resection = data.to(
-                    device), survival_day.to(device), age.to(
-                        device), resection.to(device)
+            for i, (data, survival_day, age,
+                    resection) in enumerate(p.track(test_dataloader, task_id=task), 1):
+                data, survival_day, age, resection = data.to(device), survival_day.to(
+                    device), age.to(device), resection.to(device)
                 #result = model(data, age, resection)
                 x_test_feature.append(
                     np.hstack([
@@ -146,7 +143,6 @@ for fold_ in range(5):
             y_pred = tmodel.predict(x_test_feature)
             y_test_ret = np.array(y_test)
             y_pred_ret = y_pred
-
             """y_test_ret = test_dataset.scaler.inverse_transform(
                 np.array(y_test).reshape(-1, 1)).flatten()
             y_pred_ret = test_dataset.scaler.inverse_transform(
@@ -179,4 +175,7 @@ for fold_ in range(5):
                 f"[{ci_lower:.4f},{ci_upper:.4f}]"
             ]
             f.write(",".join(map(str, ns)) + "\n")
-            pd.DataFrame({"y_true": y_test_ret, "y_pred": y_pred_ret}).to_csv(module_path / rf"{nc[i.__name__]}.csv")
+            pd.DataFrame({
+                "y_true": y_test_ret,
+                "y_pred": y_pred_ret
+            }).to_csv(module_path / rf"{nc[i.__name__]}.csv")

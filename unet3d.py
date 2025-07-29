@@ -2,9 +2,10 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 
+
 class RegressionModel(nn.Module):
 
-    def __init__(self, with_clinical=False, middle=2, clinical_ = 4) -> None:
+    def __init__(self, with_clinical=False, middle=2, clinical_=4) -> None:
         super().__init__()
         self.with_clinical = with_clinical
         self.encoder_model = UNet3DEncoder(4, 3)
@@ -12,10 +13,7 @@ class RegressionModel(nn.Module):
         if self.with_clinical:
             clinical_list = [nn.Linear(4, 8)]
             for i in range(3):
-                clinical_list += [
-                    nn.SELU(), nn.AlphaDropout(),
-                    nn.Linear(8, 8)
-                ]
+                clinical_list += [nn.SELU(), nn.AlphaDropout(), nn.Linear(8, 8)]
             clinical_list.append(nn.Linear(8, clinical_))
             self.clinical_model = nn.Sequential(*clinical_list)
         seq_list = [
@@ -31,13 +29,15 @@ class RegressionModel(nn.Module):
             nn.Linear(8, 1)
         ]
 
-        self.decoder_model = nn.Sequential(*seq_list[:3*middle])
+        self.decoder_model = nn.Sequential(*seq_list[:3 * middle])
         #combine_layer: nn.Linear = seq_list[3*middle]
         if with_clinical:
-            combine_layer = nn.Linear(seq_list[3*middle].in_features + (clinical_ if with_clinical else 0), seq_list[3*middle].out_features)
-            self.output_model = nn.Sequential(combine_layer, *seq_list[3*middle+1:])
+            combine_layer = nn.Linear(
+                seq_list[3 * middle].in_features + (clinical_ if with_clinical else 0),
+                seq_list[3 * middle].out_features)
+            self.output_model = nn.Sequential(combine_layer, *seq_list[3 * middle + 1:])
         else:
-            self.output_model = nn.Sequential(*seq_list[3*middle:])
+            self.output_model = nn.Sequential(*seq_list[3 * middle:])
 
     def forward(self, x, age, resection):
         # embedding the input
@@ -48,13 +48,14 @@ class RegressionModel(nn.Module):
         x = self.decoder_model(x)
         if self.with_clinical:
             #clinical = self.clinical_encoder(torch.cat((age, resection), dim=1))
-            clinical_data = self.clinical_model(
-                torch.cat((age, resection), dim=1))
+            clinical_data = self.clinical_model(torch.cat((age, resection), dim=1))
             x = torch.cat((x, clinical_data), dim=1)
         x = self.output_model(x)
         return x
 
+
 class DoubleConv(nn.Module):
+
     def __init__(self, in_channels, out_channels, bath_normal=False):
         super(DoubleConv, self).__init__()
         channels = out_channels // 2
@@ -67,14 +68,12 @@ class DoubleConv(nn.Module):
             # kernel_size：卷积核大小
             # stride：步长
             # padding：边缘填充
-
             nn.Conv3d(in_channels, channels, kernel_size=3, stride=1, padding=0),
             nn.ReLU(True),
-
             nn.Conv3d(channels, out_channels, kernel_size=3, stride=1, padding=0),
             nn.ReLU(True)
         ]
-        if bath_normal: # 如果要添加BN层
+        if bath_normal:  # 如果要添加BN层
             layers.insert(1, nn.BatchNorm3d(channels))
             layers.insert(len(layers) - 1, nn.BatchNorm3d(out_channels))
 
@@ -84,18 +83,21 @@ class DoubleConv(nn.Module):
     def forward(self, x):
         return self.double_conv(x)
 
+
 class DownSampling(nn.Module):
+
     def __init__(self, in_channels, out_channels, batch_normal=False):
         super(DownSampling, self).__init__()
         self.maxpool_to_conv = nn.Sequential(
             nn.MaxPool3d(kernel_size=2, stride=2),
-            DoubleConv(in_channels, out_channels, batch_normal)
-        )
+            DoubleConv(in_channels, out_channels, batch_normal))
 
     def forward(self, x):
         return self.maxpool_to_conv(x)
 
+
 class UpSampling(nn.Module):
+
     def __init__(self, in_channels, out_channels, batch_normal=False, bilinear=True):
         super(UpSampling, self).__init__()
         if bilinear:
@@ -103,8 +105,12 @@ class UpSampling(nn.Module):
             self.up = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
         else:
             # 采用反卷积进行上采样
-            self.up = nn.ConvTranspose3d(in_channels, in_channels // 2, kernel_size=2, stride=2)
-        self.conv = DoubleConv(in_channels + in_channels / 2, out_channels, batch_normal)
+            self.up = nn.ConvTranspose3d(in_channels,
+                                         in_channels // 2,
+                                         kernel_size=2,
+                                         stride=2)
+        self.conv = DoubleConv(in_channels + in_channels / 2, out_channels,
+                               batch_normal)
 
     # inputs1：上采样的数据（对应图中黄色箭头传来的数据）
     # inputs2：特征融合的数据（对应图中绿色箭头传来的数据）
@@ -117,15 +123,19 @@ class UpSampling(nn.Module):
         outputs = self.conv(outputs)
         return outputs
 
+
 class LastConv(nn.Module):
-    def __init__(self, in_channels, out_channels ):
+
+    def __init__(self, in_channels, out_channels):
         super(LastConv, self).__init__()
-        self.conv = nn.Conv3d(in_channels, out_channels, kernel_size=1 )
+        self.conv = nn.Conv3d(in_channels, out_channels, kernel_size=1)
 
     def forward(self, x):
         return self.conv(x)
 
+
 class UNet3DEncoderSmall(nn.Module):
+
     def __init__(self, in_channels, num_classes=3, batch_normal=False, bilinear=True):
         super().__init__()
         self.in_channels = in_channels
@@ -146,7 +156,9 @@ class UNet3DEncoderSmall(nn.Module):
         #print(x1.shape, x2.shape, x3)
         return x1, x2, x3, x4
 
+
 class UNet3DEncoder(nn.Module):
+
     def __init__(self, in_channels, num_classes=3, batch_normal=False, bilinear=True):
         super().__init__()
         self.in_channels = in_channels
@@ -167,7 +179,9 @@ class UNet3DEncoder(nn.Module):
 
         return x1, x2, x3, x4
 
+
 class UNet3DDecoder(nn.Module):
+
     def __init__(self, in_channels, num_classes=3, batch_normal=False, bilinear=True):
         super().__init__()
         self.in_channels = in_channels
@@ -190,7 +204,9 @@ class UNet3DDecoder(nn.Module):
 
         return x
 
+
 class UNet3D(nn.Module):
+
     def __init__(self, in_channels, num_classes=2, batch_normal=False, bilinear=True):
         super(UNet3D, self).__init__()
         self.in_channels = in_channels
@@ -221,6 +237,7 @@ class UNet3D(nn.Module):
         x = self.outputs(x7)
 
         return x
+
 
 if __name__ == "__main__":
     input = torch.randint(

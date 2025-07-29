@@ -1,18 +1,19 @@
+import sys
+
+import matplotlib.pyplot as plt
+import numpy as np
 import torch
+from lifelines import KaplanMeierFitter
+from lifelines.statistics import logrank_test
+from lifelines.utils import concordance_index
+from rich.progress import track
+from scipy.stats import pearsonr, spearmanr
+from sklearn.metrics import mean_absolute_error, mean_squared_error
+from torch import nn
 from torch.utils.data import DataLoader
+
 from dataloader import BraTSDataset
 from image_encoder3D import VitRegressionModel
-from lifelines.utils import concordance_index
-from torch import nn
-from lifelines import KaplanMeierFitter
-import matplotlib.pyplot as plt
-from lifelines.statistics import logrank_test
-import sys
-from scipy.stats import pearsonr, spearmanr
-from rich.progress import track
-from sklearn.metrics import mean_absolute_error, mean_squared_error
-import sys
-import numpy as np
 
 device = "cuda:0"
 
@@ -59,10 +60,8 @@ def val(epoch: int):
         preds = dataset.scaler.inverse_transform(np.array(preds).reshape(1, -1))
         truths = dataset.scaler.inverse_transform(np.array(truths).reshape(1, -1))
     #print(truths, preds)
-    print(
-        f"MAE = {mean_absolute_error(truths, preds)}, "
-        f"RMSE = {mean_squared_error(truths, preds)**0.5}"
-    )
+    print(f"MAE = {mean_absolute_error(truths, preds)}, "
+          f"RMSE = {mean_squared_error(truths, preds)**0.5}")
     mae = mean_absolute_error(truths, preds)
     rsme = mean_squared_error(truths, preds)**0.5
     all_ = [(truth, pred) for truth, pred in zip(truths, preds)]
@@ -71,12 +70,12 @@ def val(epoch: int):
 
     c_index = concordance_index(truths, preds)
 
-
     #statistic, p_value = pearsonr(preds, truths)
     #print(f"PearsonR: {statistic=}, {p_value=}")
     #statistic, p_value = spearmanr(preds, truths)
     #print(f"SpearmanR: {statistic=}, {p_value=}")
     return c_index, mae, rsme
+
 
 if __name__ == "__main__":
     c_indexs, maes, rsmes = [], [], []

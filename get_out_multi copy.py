@@ -1,22 +1,21 @@
-import torch
+import sys
+
+import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
+import pingouin as pg
+import torch
+from lifelines import CoxPHFitter, KaplanMeierFitter
+from lifelines.statistics import logrank_test
+from lifelines.utils import concordance_index
+from rich.progress import track
+from scipy.stats import pearsonr, spearmanr
+from sklearn.metrics import mean_absolute_error, mean_squared_error
+from torch import nn
 from torch.utils.data import DataLoader
+
 from dataloader import BraTSDataset
 from image_encoder3D import VitRegressionModel
-from lifelines.utils import concordance_index
-from torch import nn
-from lifelines import KaplanMeierFitter
-import matplotlib.pyplot as plt
-from lifelines.statistics import logrank_test
-import sys
-from scipy.stats import pearsonr, spearmanr
-from rich.progress import track
-from sklearn.metrics import mean_absolute_error, mean_squared_error
-import sys
-import numpy as np
-import pingouin as pg
-from lifelines import KaplanMeierFitter
-from lifelines import CoxPHFitter
 
 device = "cuda:0"
 
@@ -43,9 +42,8 @@ def val():
     criterion_segment = losses.DiceLoss(to_onehot_y=False, sigmoid=True).cuda()
     with torch.no_grad():
         for data, segment, survival_day, age, resection in loader:
-            data, survival_day, age, resection = data.to(
-                device), survival_day.to(device), age.to(device), resection.to(
-                    device)
+            data, survival_day, age, resection = data.to(device), survival_day.to(
+                device), age.to(device), resection.to(device)
             segment = segment.to(device)
             seg, output = model(data)
             segment_loss = criterion_segment(seg, segment)
@@ -62,10 +60,8 @@ def val():
             dice_loss += 1 - s
             print(s)
             #print(loss_, mse)
-        preds = dataset.scaler.inverse_transform(
-            np.array(preds).reshape(1, -1))
-        truths = dataset.scaler.inverse_transform(
-            np.array(truths).reshape(1, -1))
+        preds = dataset.scaler.inverse_transform(np.array(preds).reshape(1, -1))
+        truths = dataset.scaler.inverse_transform(np.array(truths).reshape(1, -1))
     #print(truths, preds)
     print(f"Dice = {dice_loss / len(loader):.2%},")
     print(f"MAE = {mean_absolute_error(truths, preds)}, "
@@ -116,19 +112,23 @@ def val():
             event_observed=[1 for i in preds],
             label="Predict")
     kmf.plot_survival_function(ax=ax)"""
-    pd.DataFrame({"y_true": truths, "y_pred": preds}).to_csv(rf"combination_exp_multi/{op.stem}.csv")
+    pd.DataFrame({
+        "y_true": truths,
+        "y_pred": preds
+    }).to_csv(rf"combination_exp_multi/{op.stem}.csv")
     return c_index, mae, rsme, pearsonr_value, spearmanr_value, ax,  #p_value, hr, ci_lower, ci_upper
 
 
 if __name__ == "__main__":
-    from pathlib import Path
     import csv
+    from pathlib import Path
 
     #for i in range(5):
 
     dataset = BraTSDataset(
         r"D:\yolov9\BraTS2020_TrainingData\MICCAI_BraTS2020_TrainingData",
-        "test", using_seg=True)
+        "test",
+        using_seg=True)
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
 
     p = Path(f"combination_exp_multi_freeze")
@@ -136,8 +136,7 @@ if __name__ == "__main__":
     with open(p / f"0_0_testing.csv", "w", encoding="UTF-8", newline="") as f:
         writer = csv.writer(f)
         writer.writerow([
-            "Optimizer", "Best Epoch", "MAE", "RSME", "C index",
-            "PearsonR", "SpearmanR"
+            "Optimizer", "Best Epoch", "MAE", "RSME", "C index", "PearsonR", "SpearmanR"
         ])
         #for op in track(list(p.iterdir())):
         #if not op.is_dir() or op.name.startswith("_"): continue
@@ -154,6 +153,6 @@ if __name__ == "__main__":
             spearmanr_value,  #p_value, hr,
             #f"[{ci_lower:.4f},{ci_upper:.4f}]"
         ])
-            #plt.title(f'KM plot with {op.name}')
-            #plt.savefig(f"{op}_ba.png")
-            #plt.cla()
+        #plt.title(f'KM plot with {op.name}')
+        #plt.savefig(f"{op}_ba.png")
+        #plt.cla()
