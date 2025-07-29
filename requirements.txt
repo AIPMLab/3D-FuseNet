@@ -1,0 +1,25 @@
+
+# Deep learning
+torch
+torchextractor
+monai
+
+# Data analyse
+pandas
+numpy
+scikit-learn
+lifelines
+scipy
+
+# Image & Radiomics
+SimpleITK
+pyradiomics
+
+# plotting
+matplotlib
+seaborn
+pingouin
+
+# beauty
+rich
+tqdm
